@@ -36,7 +36,7 @@ MP3, FLAC, M4A, AAC, OGG, Opus, WMA
 - Python 3.11+
 - `ffmpeg` e `chromaprint-tools` (installati automaticamente da `install.sh`)
 
-> **Nota:** Il codice Python è cross-platform, ma `install.sh` e il timer systemd sono specifici per Linux. Su macOS/Windows puoi eseguire il tagger manualmente dopo aver installato le dipendenze con `uv sync` e assicurandoti che `ffmpeg` e `fpcalc` siano nel PATH.
+> **Nota:** Il codice Python è cross-platform. L'installer automatico `install.sh` è specifico per Linux, ma sono disponibili guide passo passo per [macOS](#installazione-su-macos) e [Windows](#installazione-su-windows) più in basso.
 
 ## Installazione
 
@@ -58,9 +58,9 @@ L'installer fa tutto da solo:
 - Configura un servizio systemd con timer notturno (vedi [Schedulazione](#schedulazione))
 - Esegue un test dry-run per verificare il setup
 
-### Setup Manuale
+### Setup Manuale (Linux)
 
-Se preferisci configurare tutto a mano:
+Se preferisci configurare tutto a mano su Linux:
 
 ```bash
 cd audio-filename-fixer
@@ -75,6 +75,319 @@ uv sync
 cp .env.example config.env
 # Modifica config.env con le tue impostazioni
 ```
+
+### Installazione su macOS
+
+<details>
+<summary>Clicca per espandere la guida passo passo per macOS</summary>
+
+#### Passo 1: Installa Homebrew (se non ce l'hai)
+
+Homebrew è un gestore di pacchetti per macOS — pensalo come un "app store per strumenti da sviluppatore". Apri il **Terminale** (lo trovi in Applicazioni > Utility, oppure cercalo con Spotlight) e incolla:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Segui le istruzioni a schermo. Quando ha finito, chiudi e riapri il Terminale.
+
+Per verificare che funzioni, scrivi:
+
+```bash
+brew --version
+```
+
+Dovresti vedere qualcosa come `Homebrew 4.x.x`.
+
+#### Passo 2: Installa le dipendenze di sistema
+
+Sempre nel Terminale, esegui:
+
+```bash
+brew install ffmpeg chromaprint
+```
+
+Questo installa `ffmpeg` (decodificatore audio) e `fpcalc` (strumento per il fingerprint audio). Potrebbe impiegare qualche minuto.
+
+Verifica che siano installati:
+
+```bash
+ffmpeg -version
+fpcalc -version
+```
+
+Entrambi i comandi dovrebbero stampare informazioni sulla versione (non "command not found").
+
+#### Passo 3: Installa uv (gestore pacchetti Python)
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Chiudi e riapri il Terminale, poi verifica:
+
+```bash
+uv --version
+```
+
+#### Passo 4: Scarica e configura il progetto
+
+```bash
+git clone https://github.com/AndreaBonn/audio-filename-fixer.git
+cd audio-filename-fixer
+uv sync
+```
+
+#### Passo 5: Crea il file di configurazione
+
+```bash
+cp .env.example config.env
+```
+
+Ora apri `config.env` con un qualsiasi editor di testo (TextEdit, VS Code, nano...) e imposta il percorso della tua cartella musica:
+
+```bash
+nano config.env
+```
+
+Modifica `MUSIC_DIR` in modo che punti alla tua cartella musica, ad esempio:
+
+```
+MUSIC_DIR=/Users/tuonome/Music
+```
+
+Salva e chiudi (in nano: `Ctrl+O`, `Invio`, `Ctrl+X`).
+
+#### Passo 6: Testa il funzionamento
+
+```bash
+uv run python music_tagger.py --dry-run --music-dir ~/Music
+```
+
+Questo esegue in modalità anteprima — mostra cosa cambierebbe senza toccare nessun file. Se vedi un output che elenca i tuoi file audio, tutto funziona.
+
+#### Passo 7: Esegui per davvero
+
+Quando sei soddisfatto dell'output del dry-run:
+
+```bash
+uv run python music_tagger.py
+```
+
+#### Opzionale: Esecuzione automatica su macOS
+
+macOS usa `launchd` invece di systemd. Per eseguire il tagger ogni notte alle 3:00:
+
+1. Crea il file `~/Library/LaunchAgents/com.music-tagger.plist`:
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+cat > ~/Library/LaunchAgents/com.music-tagger.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.music-tagger</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>cd "$HOME/audio-filename-fixer" && source config.env && .venv/bin/python music_tagger.py</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/music-tagger.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/music-tagger.log</string>
+</dict>
+</plist>
+EOF
+```
+
+2. Attivalo:
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.music-tagger.plist
+```
+
+3. Per disattivarlo in futuro:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.music-tagger.plist
+```
+
+</details>
+
+### Installazione su Windows
+
+<details>
+<summary>Clicca per espandere la guida passo passo per Windows</summary>
+
+#### Passo 1: Installa Python 3.11+
+
+1. Vai su [python.org/downloads](https://www.python.org/downloads/) e scarica l'installer di Python più recente
+2. Avvia l'installer
+3. **Importante:** spunta la casella **"Add Python to PATH"** in fondo alla prima schermata
+4. Clicca "Install Now"
+
+Per verificare, apri **PowerShell** (cercalo nel menu Start) e scrivi:
+
+```powershell
+python --version
+```
+
+Dovresti vedere `Python 3.11.x` o superiore.
+
+#### Passo 2: Installa Git (se non ce l'hai)
+
+1. Vai su [git-scm.com/downloads/win](https://git-scm.com/downloads/win) e scarica l'installer
+2. Avvialo con le impostazioni predefinite (clicca "Next" su tutte le schermate)
+
+Verifica in PowerShell:
+
+```powershell
+git --version
+```
+
+#### Passo 3: Installa ffmpeg
+
+1. Vai su [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/) e scarica **"ffmpeg-release-essentials.zip"**
+2. Estrai il file zip in `C:\ffmpeg` (crea questa cartella se non esiste)
+3. All'interno troverai una cartella tipo `ffmpeg-7.x-essentials_build` — aprila e vai nella cartella `bin`
+4. Copia il percorso completo della cartella `bin` (es. `C:\ffmpeg\ffmpeg-7.1-essentials_build\bin`)
+5. Aggiungilo al PATH:
+   - Premi `Win + R`, scrivi `sysdm.cpl`, premi Invio
+   - Vai nella scheda **"Avanzate"**, clicca **"Variabili d'ambiente"**
+   - In "Variabili utente", trova **"Path"**, selezionalo, clicca **"Modifica"**
+   - Clicca **"Nuovo"** e incolla il percorso della cartella `bin`
+   - Clicca **"OK"** su tutte le finestre
+
+Chiudi e riapri PowerShell, poi verifica:
+
+```powershell
+ffmpeg -version
+```
+
+#### Passo 4: Installa fpcalc (Chromaprint)
+
+1. Vai su [acoustid.org/chromaprint](https://acoustid.org/chromaprint) e scarica il pacchetto per **Windows**
+2. Estrai il file zip
+3. Copia `fpcalc.exe` nella stessa cartella `bin` dove hai messo ffmpeg (es. `C:\ffmpeg\ffmpeg-7.1-essentials_build\bin`), così è già nel tuo PATH
+
+Verifica:
+
+```powershell
+fpcalc -version
+```
+
+#### Passo 5: Installa uv (gestore pacchetti Python)
+
+In PowerShell, esegui:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Chiudi e riapri PowerShell, poi verifica:
+
+```powershell
+uv --version
+```
+
+#### Passo 6: Scarica e configura il progetto
+
+```powershell
+git clone https://github.com/AndreaBonn/audio-filename-fixer.git
+cd audio-filename-fixer
+uv sync
+```
+
+#### Passo 7: Crea il file di configurazione
+
+```powershell
+copy .env.example config.env
+```
+
+Apri `config.env` con il Blocco Note:
+
+```powershell
+notepad config.env
+```
+
+Modifica `MUSIC_DIR` in modo che punti alla tua cartella musica, ad esempio:
+
+```
+MUSIC_DIR=C:\Users\TuoNome\Music
+```
+
+Salva e chiudi il Blocco Note.
+
+#### Passo 8: Carica la configurazione e testa
+
+In PowerShell, devi caricare le variabili d'ambiente da `config.env` prima di eseguire:
+
+```powershell
+Get-Content config.env | ForEach-Object {
+    if ($_ -match '^([^#][^=]+)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    }
+}
+
+uv run python music_tagger.py --dry-run
+```
+
+Questo esegue in modalità anteprima — mostra cosa cambierebbe senza toccare nessun file.
+
+#### Passo 9: Esegui per davvero
+
+Carica la configurazione ed esegui (stessi due comandi, senza `--dry-run`):
+
+```powershell
+Get-Content config.env | ForEach-Object {
+    if ($_ -match '^([^#][^=]+)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    }
+}
+
+uv run python music_tagger.py
+```
+
+**Suggerimento:** Per evitare di digitare il comando di caricamento config ogni volta, puoi creare un file scorciatoia. Salva questo come `run.ps1` nella cartella del progetto:
+
+```powershell
+# run.ps1 — Esegui il music tagger su Windows
+Get-Content "$PSScriptRoot\config.env" | ForEach-Object {
+    if ($_ -match '^([^#][^=]+)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    }
+}
+uv run python "$PSScriptRoot\music_tagger.py" @args
+```
+
+Poi eseguilo con: `powershell -File run.ps1` oppure `powershell -File run.ps1 --dry-run`.
+
+#### Opzionale: Esecuzione automatica su Windows
+
+1. Apri **Utilità di pianificazione** (cercalo nel menu Start)
+2. Clicca **"Crea attività di base"** nel pannello destro
+3. Nome: `Music Auto-Tagger`, clicca Avanti
+4. Trigger: **Ogni giorno**, clicca Avanti
+5. Imposta l'orario alle **3:00**, clicca Avanti
+6. Azione: **Avvio programma**, clicca Avanti
+7. Programma: `powershell`
+8. Argomenti: `-ExecutionPolicy Bypass -File "C:\Users\TuoNome\audio-filename-fixer\run.ps1"`
+9. Clicca Fine
+
+Per testarlo subito: clicca col tasto destro sull'attività e seleziona **"Esegui"**.
+
+</details>
 
 ## Configurazione
 
