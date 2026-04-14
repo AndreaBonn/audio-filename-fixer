@@ -3,7 +3,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-> **[Leggi in italiano](README.it.md)**
+> **[Leggi in italiano](README.it.md)** | **[Security](SECURITY.md)**
 
 Automatically fix metadata and rename audio files in your music library. Runs nightly as a systemd service or on-demand from the command line.
 

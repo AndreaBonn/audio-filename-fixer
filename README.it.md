@@ -3,7 +3,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-> **[Read in English](README.md)**
+> **[Read in English](README.md)** | **[Sicurezza](SECURITY.it.md)**
 
 Corregge automaticamente i metadati e rinomina i file audio nella tua libreria musicale. Funziona ogni notte come servizio systemd o su richiesta da riga di comando.
 
