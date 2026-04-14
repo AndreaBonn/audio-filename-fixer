@@ -101,13 +101,28 @@ class TestWriteTags:
         assert "Radiohead" in str(tags["TPE1"])
         assert str(tags["TALB"]) == "Pablo Honey"
 
-    def test_handles_write_error_gracefully(self, tmp_path: Path):
+    def test_returns_false_on_write_error(self, tmp_path: Path):
         bad_path = str(tmp_path / "nonexistent" / "file.mp3")
-        # Non deve sollevare eccezioni
-        write_tags(
+        result = write_tags(
             bad_path,
             {"title": "X", "artists": ["Y"], "album": "", "year": ""},
         )
+        assert result is False
+
+    def test_returns_true_on_success(self, mp3_file: Path):
+        result = write_tags(
+            str(mp3_file),
+            {"title": "Creep", "artists": ["Radiohead"], "album": "", "year": ""},
+        )
+        assert result is True
+
+    def test_dry_run_returns_true(self, mp3_file: Path):
+        result = write_tags(
+            str(mp3_file),
+            {"title": "X", "artists": ["Y"], "album": "", "year": ""},
+            dry_run=True,
+        )
+        assert result is True
 
 
 class TestRenameFile:

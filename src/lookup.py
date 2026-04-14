@@ -18,7 +18,7 @@ def _fpcalc_available() -> bool:
     try:
         subprocess.run(["fpcalc", "-version"], capture_output=True, check=True)
         return True
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, OSError, subprocess.CalledProcessError):
         return False
 
 
@@ -41,8 +41,14 @@ def acoustid_lookup(path: str, config: Config) -> dict | None:
                 continue
             log.info(f"  AcoustID match (score={score:.2f}): {artist} - {title}")
             return _mb_recording_details(recording_id)
-    except (acoustid.AcoustidError, OSError) as e:
-        log.debug(f"AcoustID error: {e}")
+    except acoustid.WebServiceError as e:
+        log.warning(f"  AcoustID API non raggiungibile per {path}: {e}")
+    except acoustid.FingerprintGenerationError as e:
+        log.warning(f"  Fingerprint non generabile per {path}: {e}")
+    except acoustid.AcoustidError as e:
+        log.warning(f"  AcoustID errore per {path}: {e}")
+    except OSError as e:
+        log.warning(f"  Errore I/O durante fingerprint di {path}: {e}")
     return None
 
 
@@ -70,8 +76,10 @@ def _mb_recording_details(recording_id: str) -> dict | None:
 
         if title and artists:
             return {"title": title, "artists": artists, "album": album, "year": year}
-    except (MusicBrainzError, OSError) as e:
-        log.debug(f"MB recording details error: {e}")
+    except MusicBrainzError as e:
+        log.warning(f"  MusicBrainz API errore per recording {recording_id}: {e}")
+    except OSError as e:
+        log.warning(f"  Errore I/O recupero dettagli recording {recording_id}: {e}")
     return None
 
 
@@ -120,6 +128,8 @@ def mb_search(artists: list[str], title: str) -> dict | None:
                 "year": year,
             }
 
-    except (MusicBrainzError, OSError) as e:
-        log.debug(f"MusicBrainz search error: {e}")
+    except MusicBrainzError as e:
+        log.warning(f"  MusicBrainz ricerca fallita: {e}")
+    except OSError as e:
+        log.warning(f"  Errore I/O durante ricerca MusicBrainz: {e}")
     return None

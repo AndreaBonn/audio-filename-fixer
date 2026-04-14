@@ -48,6 +48,13 @@ class TestBuildFilename:
         assert len(result) <= 200
         assert result.endswith(".opus")
 
+    def test_truncation_no_double_extension(self):
+        """Verifica che il troncamento non produca doppia estensione."""
+        long_title = "A" * 250
+        result = build_filename(["X"], long_title, ".flac")
+        assert result.count(".flac") == 1
+        assert not result.endswith(".fla.flac")
+
 
 class TestParseFilename:
     def test_artist_dash_title(self):

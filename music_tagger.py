@@ -51,7 +51,7 @@ def process_file(path: str, state: dict, config: Config) -> bool:
     # Controlla se il nome file è già nel formato corretto
     # \b\d{6,}\b cattura solo sequenze di 6+ cifre (ID video/hash),
     # evitando falsi positivi su nomi come "Blink 182" o "U2"
-    name_ok = re.match(r"^[A-Za-z].+ - .+\.\w+$", p.name) and not re.search(
+    name_ok = re.match(r"^[\w].+ - .+\.\w+$", p.name, re.UNICODE) and not re.search(
         r"(youtube|youtu\.be|\bvideo\b|www\.|http|official|\b\d{6,}\b)",
         p.stem,
         re.I,
@@ -88,7 +88,10 @@ def process_file(path: str, state: dict, config: Config) -> bool:
             log.warning(f"  ✗ Impossibile determinare info per {p.name}, skip")
             return False
 
-    write_tags(path, info, dry_run=config.dry_run)
+    tags_written = write_tags(path, info, dry_run=config.dry_run)
+    if not tags_written:
+        return False
+
     new_path = rename_file(path, info, dry_run=config.dry_run)
 
     # Aggiorna state con il nuovo path
@@ -96,8 +99,8 @@ def process_file(path: str, state: dict, config: Config) -> bool:
         checksum = file_checksum(new_path)
         state.pop(path, None)
         state[new_path] = checksum
-    except OSError:
-        pass
+    except OSError as e:
+        log.warning(f"  Impossibile aggiornare state per {new_path}: {e}")
 
     return True
 

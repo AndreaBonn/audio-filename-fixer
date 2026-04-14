@@ -16,14 +16,19 @@ def read_existing_tags(path: str) -> dict:
     try:
         audio = MutagenFile(path, easy=True)
         if audio is None:
+            log.warning(f"Formato audio non riconosciuto: {path}")
             return result
         result["title"] = audio.get("title", [""])[0]
         result["artists"] = audio.get("artist", [])
         result["album"] = audio.get("album", [""])[0]
         result["year"] = audio.get("date", [""])[0][:4]
         result["track"] = audio.get("tracknumber", [""])[0]
+    except PermissionError:
+        log.error(f"Permesso negato in lettura tag: {path}")
+    except OSError as e:
+        log.warning(f"Errore I/O lettura tag {path}: {e}")
     except Exception as e:
-        log.debug(f"Errore lettura tag {path}: {e}")
+        log.error(f"Errore inatteso lettura tag {path}: {e}", exc_info=True)
     return result
 
 
@@ -34,11 +39,11 @@ def tags_look_complete(tags: dict) -> bool:
     return has_title and has_artist
 
 
-def write_tags(path: str, info: dict, *, dry_run: bool = False):
-    """Scrive i metadati nel file audio. Supporta mp3, flac, m4a, ogg."""
+def write_tags(path: str, info: dict, *, dry_run: bool = False) -> bool:
+    """Scrive i metadati nel file audio. Ritorna True se la scrittura ha successo."""
     if dry_run:
         log.info(f"  [DRY RUN] Scrittura tag: {info}")
-        return
+        return True
 
     ext = Path(path).suffix.lower()
     title = info.get("title", "")
@@ -92,21 +97,30 @@ def write_tags(path: str, info: dict, *, dry_run: bool = False):
             audio.save()
 
         else:
-            # Fallback con easy tags
             audio = MutagenFile(path, easy=True)
-            if audio:
-                audio["title"] = title
-                audio["artist"] = artist_str
-                if album:
-                    audio["album"] = album
-                if year:
-                    audio["date"] = year
-                audio.save()
+            if audio is None:
+                log.warning(f"  Formato non supportato per scrittura tag: {ext}")
+                return False
+            audio["title"] = title
+            audio["artist"] = artist_str
+            if album:
+                audio["album"] = album
+            if year:
+                audio["date"] = year
+            audio.save()
 
         log.info(f"  ✓ Tag scritti: {artist_str} - {title}")
+        return True
 
+    except PermissionError:
+        log.error(f"  ✗ Permesso negato: impossibile scrivere tag in {path}")
+        return False
+    except OSError as e:
+        log.error(f"  ✗ Errore I/O scrittura tag {path}: {e}")
+        return False
     except Exception as e:
-        log.error(f"  ✗ Errore scrittura tag {path}: {e}")
+        log.error(f"  ✗ Errore inatteso scrittura tag {path}: {e}", exc_info=True)
+        return False
 
 
 def rename_file(path: str, info: dict, *, dry_run: bool = False) -> str:
@@ -117,6 +131,11 @@ def rename_file(path: str, info: dict, *, dry_run: bool = False) -> str:
     p = Path(path)
     new_name = build_filename(info["artists"], info["title"], p.suffix.lower())
     new_path = p.parent / new_name
+
+    # Verifica path traversal
+    if not new_path.resolve().is_relative_to(p.parent.resolve()):
+        log.error(f"  ✗ Path traversal bloccato per {new_name}")
+        return path
 
     if new_path == p:
         log.info(f"  Nome già corretto: {p.name}")
@@ -135,6 +154,9 @@ def rename_file(path: str, info: dict, *, dry_run: bool = False) -> str:
         p.rename(new_path)
         log.info(f"  ✓ Rinominato: {p.name} → {new_name}")
         return str(new_path)
-    except Exception as e:
+    except PermissionError:
+        log.error(f"  ✗ Permesso negato: impossibile rinominare {path}")
+        return path
+    except OSError as e:
         log.error(f"  ✗ Errore rinomina {path}: {e}")
         return path

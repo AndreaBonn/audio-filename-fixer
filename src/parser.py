@@ -26,12 +26,12 @@ def build_filename(artists: list[str], title: str, ext: str) -> str:
     artist_str = ", ".join(a.strip() for a in artists if a.strip())
     artist_str = artist_str or "Unknown Artist"
     title = title.strip() or "Unknown Title"
-    name = f"{slugify(artist_str)}-{slugify(title)}{ext}"
+    stem = f"{slugify(artist_str)}-{slugify(title)}"
     # Limita lunghezza totale a 200 caratteri (limite filesystem sicuro)
     max_stem = 200 - len(ext)
-    if len(name) > 200:
-        name = name[:max_stem] + ext
-    return name
+    if len(stem) > max_stem:
+        stem = stem[:max_stem]
+    return f"{stem}{ext}"
 
 
 def _split_artists(text: str) -> list[str]:

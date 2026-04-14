@@ -16,16 +16,29 @@ def load_state(config: Config) -> dict:
     return {}
 
 
-def save_state(state: dict, config: Config):
-    """Persiste lo stato su disco (skip in dry-run)."""
-    if not config.dry_run:
-        with open(config.state_file, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
+def save_state(state: dict, config: Config) -> None:
+    """Persiste lo stato su disco con scrittura atomica (skip in dry-run)."""
+    if config.dry_run:
+        return
+
+    state_path = Path(config.state_file)
+    tmp_path = state_path.with_suffix(".tmp")
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        tmp_path.replace(state_path)
+    except OSError as e:
+        log.error(f"Impossibile salvare stato in {config.state_file}: {e}")
+        # Pulizia file temporaneo se esiste
+        tmp_path.unlink(missing_ok=True)
 
 
 def file_checksum(path: str) -> str:
     """SHA-1 dei primi 64KB — abbastanza per rilevare modifiche, veloce."""
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     with open(path, "rb") as f:
         h.update(f.read(65536))
     return h.hexdigest()
@@ -38,5 +51,6 @@ def already_processed(path: str, state: dict) -> bool:
         return False
     try:
         return state[key] == file_checksum(path)
-    except OSError:
+    except OSError as e:
+        log.warning(f"Impossibile calcolare checksum per {path}, verrà riprocessato: {e}")
         return False
