@@ -41,8 +41,8 @@ MP3, FLAC, M4A, AAC, OGG, Opus, WMA
 ### Setup Rapido (consigliato)
 
 ```bash
-git clone <repo-url> music-tagger
-cd music-tagger
+git clone https://github.com/AndreaBonn/audio-filename-fixer.git
+cd audio-filename-fixer
 
 # Installa tutto — richiede sudo per i pacchetti apt
 bash install.sh /percorso/alla/tua/musica
@@ -61,7 +61,7 @@ L'installer fa tutto da solo:
 Se preferisci configurare tutto a mano:
 
 ```bash
-cd music-tagger
+cd audio-filename-fixer
 
 # Installa dipendenze di sistema
 sudo apt-get install -y ffmpeg chromaprint-tools
@@ -175,7 +175,7 @@ crontab -e
 ## Struttura del Progetto
 
 ```
-music-tagger/
+audio-filename-fixer/
 ├── music_tagger.py       # Entry point — orchestra la pipeline
 ├── src/
 │   ├── config.py         # Configurazione centralizzata (dataclass + env vars)

@@ -9,7 +9,9 @@ from musicbrainzngs import MusicBrainzError
 from src.config import REQUEST_DELAY, Config, log
 
 # MusicBrainz setup
-musicbrainzngs.set_useragent("MusicAutoTagger", "1.0", "https://github.com/local/music-tagger")
+musicbrainzngs.set_useragent(
+    "MusicAutoTagger", "1.0", "https://github.com/AndreaBonn/audio-filename-fixer"
+)
 musicbrainzngs.set_rate_limit(REQUEST_DELAY)
 
 
