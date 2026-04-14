@@ -1,0 +1,31 @@
+[project]
+name = "music-tagger"
+version = "1.0.0"
+description = "Rinomina e aggiusta i metadati delle canzoni automaticamente"
+requires-python = ">=3.11"
+dependencies = [
+    "mutagen",
+    "musicbrainzngs",
+    "pyacoustid",
+    "requests",
+]
+
+[project.scripts]
+music-tagger = "music_tagger:main"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "pip-audit>=2.10.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.10",
+]
