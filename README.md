@@ -36,6 +36,8 @@ MP3, FLAC, M4A, AAC, OGG, Opus, WMA
 - Python 3.11+
 - `ffmpeg` and `chromaprint-tools` (installed automatically by `install.sh`)
 
+> **Note:** The Python code is cross-platform, but `install.sh` and the systemd timer are Linux-specific. On macOS/Windows, you can run the tagger manually after installing dependencies with `uv sync` and ensuring `ffmpeg` and `fpcalc` are in your PATH.
+
 ## Installation
 
 ### Quick Setup (recommended)
