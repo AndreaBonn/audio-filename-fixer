@@ -1,7 +1,7 @@
 # Music Auto-Tagger
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 > **[Read in English](README.md)**
 
@@ -265,6 +265,12 @@ uv run bandit -r src/
 uv run pip-audit
 ```
 
+## Supporto
+
+Se trovi utile questo progetto, considera di lasciare una stella su GitHub — aiuta altri a scoprirlo e motiva lo sviluppo futuro.
+
 ## Licenza
 
-MIT
+Copyright 2025 Andrea Bonacci
+
+Distribuito sotto licenza Apache License, Version 2.0. Vedi [LICENSE](LICENSE) per i dettagli.
