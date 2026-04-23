@@ -54,6 +54,24 @@ class TestReadExistingTags:
         assert result["year"] == "2023"
         assert result["track"] == "3"
 
+    @patch("src.tags.MutagenFile", return_value=None)
+    def test_returns_default_when_mutagen_returns_none(self, _mock):
+        result = read_existing_tags("/fake/path.xyz")
+        assert result["title"] == ""
+        assert result["artists"] == []
+
+    @patch("src.tags.MutagenFile", side_effect=PermissionError("access denied"))
+    def test_handles_permission_error(self, _mock):
+        result = read_existing_tags("/fake/path.mp3")
+        assert result["title"] == ""
+        assert result["artists"] == []
+
+    @patch("src.tags.MutagenFile", side_effect=OSError("I/O error"))
+    def test_handles_os_error(self, _mock):
+        result = read_existing_tags("/fake/path.mp3")
+        assert result["title"] == ""
+        assert result["artists"] == []
+
 
 class TestTagsLookComplete:
     def test_complete_tags(self):
@@ -124,6 +142,121 @@ class TestWriteTags:
         )
         assert result is True
 
+    @patch("src.tags.FLAC")
+    def test_writes_flac_tags(self, mock_flac_cls, tmp_path: Path):
+        mock_audio = MagicMock()
+        mock_flac_cls.return_value = mock_audio
+        path = str(tmp_path / "track.flac")
+
+        result = write_tags(
+            path,
+            {
+                "title": "Karma Police",
+                "artists": ["Radiohead"],
+                "album": "OK Computer",
+                "year": "1997",
+            },
+        )
+
+        assert result is True
+        mock_audio.__setitem__.assert_any_call("title", "Karma Police")
+        mock_audio.__setitem__.assert_any_call("artist", "Radiohead")
+        mock_audio.__setitem__.assert_any_call("album", "OK Computer")
+        mock_audio.__setitem__.assert_any_call("date", "1997")
+        mock_audio.save.assert_called_once()
+
+    @patch("src.tags.MP4")
+    def test_writes_m4a_tags(self, mock_mp4_cls, tmp_path: Path):
+        mock_audio = MagicMock()
+        mock_mp4_cls.return_value = mock_audio
+        path = str(tmp_path / "track.m4a")
+
+        result = write_tags(
+            path,
+            {"title": "Creep", "artists": ["Radiohead"], "album": "Pablo Honey", "year": "1993"},
+        )
+
+        assert result is True
+        mock_audio.__setitem__.assert_any_call("\xa9nam", "Creep")
+        mock_audio.__setitem__.assert_any_call("\xa9ART", "Radiohead")
+        mock_audio.__setitem__.assert_any_call("\xa9alb", "Pablo Honey")
+        mock_audio.__setitem__.assert_any_call("\xa9day", "1993")
+        mock_audio.save.assert_called_once()
+
+    @patch("src.tags.OggVorbis")
+    def test_writes_ogg_tags(self, mock_ogg_cls, tmp_path: Path):
+        mock_audio = MagicMock()
+        mock_ogg_cls.return_value = mock_audio
+        path = str(tmp_path / "track.ogg")
+
+        result = write_tags(
+            path,
+            {
+                "title": "High and Dry",
+                "artists": ["Radiohead"],
+                "album": "The Bends",
+                "year": "1995",
+            },
+        )
+
+        assert result is True
+        mock_audio.__setitem__.assert_any_call("title", "High and Dry")
+        mock_audio.__setitem__.assert_any_call("artist", "Radiohead")
+        mock_audio.__setitem__.assert_any_call("album", "The Bends")
+        mock_audio.__setitem__.assert_any_call("date", "1995")
+        mock_audio.save.assert_called_once()
+
+    @patch("src.tags.MutagenFile", return_value=None)
+    def test_fallback_format_returns_false_when_unsupported(self, _mock, tmp_path: Path):
+        path = str(tmp_path / "track.wma")
+        result = write_tags(path, {"title": "X", "artists": ["Y"], "album": "", "year": ""})
+        assert result is False
+
+    @patch("src.tags.MutagenFile")
+    def test_fallback_format_writes_via_easy_tags(self, mock_mutagen_cls, tmp_path: Path):
+        mock_audio = MagicMock()
+        mock_mutagen_cls.return_value = mock_audio
+        path = str(tmp_path / "track.wma")
+
+        result = write_tags(
+            path,
+            {
+                "title": "Fake Plastic Trees",
+                "artists": ["Radiohead"],
+                "album": "The Bends",
+                "year": "1995",
+            },
+        )
+
+        assert result is True
+        mock_audio.__setitem__.assert_any_call("title", "Fake Plastic Trees")
+        mock_audio.__setitem__.assert_any_call("artist", "Radiohead")
+        mock_audio.save.assert_called_once()
+
+    def test_writes_mp3_without_album_and_year(self, mp3_file: Path):
+        info = {"title": "Creep", "artists": ["Radiohead"], "album": "", "year": ""}
+        result = write_tags(str(mp3_file), info)
+
+        assert result is True
+        tags = ID3(str(mp3_file))
+        assert str(tags["TIT2"]) == "Creep"
+        assert "TALB" not in tags
+        assert "TDRC" not in tags
+
+    @patch("src.tags.ID3", side_effect=PermissionError("access denied"))
+    def test_handles_permission_error(self, _mock, mp3_file: Path):
+        result = write_tags(
+            str(mp3_file), {"title": "X", "artists": ["Y"], "album": "", "year": ""}
+        )
+        assert result is False
+
+    @patch("src.tags.ID3", side_effect=OSError("I/O error"))
+    def test_handles_os_error(self, _mock, mp3_file: Path):
+        result = write_tags(
+            str(mp3_file), {"title": "X", "artists": ["Y"], "album": "", "year": ""}
+        )
+        assert result is False
+
 
 class TestRenameFile:
     def test_renames_correctly(self, tmp_path: Path):
@@ -160,4 +293,29 @@ class TestRenameFile:
         f.write_bytes(b"fake")
         info = {"title": "Creep", "artists": ["Radiohead"]}
         result = rename_file(str(f), info)
+        assert result == str(f)
+
+    def test_blocks_path_traversal(self, tmp_path: Path):
+        f = tmp_path / "track.mp3"
+        f.write_bytes(b"fake")
+        # build_filename sanitizes input, so we mock it to force a traversal attempt
+        with patch("src.tags.build_filename", return_value="../evil.mp3"):
+            result = rename_file(str(f), {"title": "evil", "artists": ["../hack"]})
+        assert result == str(f)
+        assert f.exists()
+
+    def test_handles_permission_error_on_rename(self, tmp_path: Path):
+        f = tmp_path / "old_name.mp3"
+        f.write_bytes(b"fake")
+        info = {"title": "Creep", "artists": ["Radiohead"]}
+        with patch("src.tags.Path.rename", side_effect=PermissionError("access denied")):
+            result = rename_file(str(f), info)
+        assert result == str(f)
+
+    def test_handles_os_error_on_rename(self, tmp_path: Path):
+        f = tmp_path / "old_name.mp3"
+        f.write_bytes(b"fake")
+        info = {"title": "Creep", "artists": ["Radiohead"]}
+        with patch("src.tags.Path.rename", side_effect=OSError("I/O error")):
+            result = rename_file(str(f), info)
         assert result == str(f)

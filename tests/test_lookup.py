@@ -1,11 +1,11 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import acoustid as acoustid_lib
 import pytest
 from musicbrainzngs import MusicBrainzError
 
 from src.config import Config
-from src.lookup import _mb_recording_details, acoustid_lookup, mb_search
+from src.lookup import _fpcalc_available, _mb_recording_details, acoustid_lookup, mb_search
 
 
 @pytest.fixture
@@ -36,6 +36,22 @@ MB_SEARCH_RESPONSE = {
         }
     ]
 }
+
+
+class TestFpcalcAvailable:
+    def test_returns_false_when_fpcalc_missing(self):
+        _fpcalc_available.cache_clear()
+        with patch("src.lookup.subprocess.run", side_effect=FileNotFoundError):
+            result = _fpcalc_available()
+        _fpcalc_available.cache_clear()
+        assert result is False
+
+    def test_returns_true_when_fpcalc_present(self):
+        _fpcalc_available.cache_clear()
+        with patch("src.lookup.subprocess.run", return_value=MagicMock(returncode=0)):
+            result = _fpcalc_available()
+        _fpcalc_available.cache_clear()
+        assert result is True
 
 
 class TestAcoustidLookup:
@@ -79,6 +95,30 @@ class TestAcoustidLookup:
     )
     @patch("src.lookup._fpcalc_available", return_value=True)
     def test_returns_none_on_api_error(self, _fpcalc, _mock_match, config_with_key: Config):
+        result = acoustid_lookup("/fake/path.mp3", config_with_key)
+        assert result is None
+
+    @patch(
+        "src.lookup.acoustid.match",
+        side_effect=acoustid_lib.FingerprintGenerationError("no fingerprint"),
+    )
+    @patch("src.lookup._fpcalc_available", return_value=True)
+    def test_returns_none_on_fingerprint_error(self, _fpcalc, _mock_match, config_with_key: Config):
+        result = acoustid_lookup("/fake/path.mp3", config_with_key)
+        assert result is None
+
+    @patch(
+        "src.lookup.acoustid.match",
+        side_effect=acoustid_lib.AcoustidError("generic error"),
+    )
+    @patch("src.lookup._fpcalc_available", return_value=True)
+    def test_returns_none_on_acoustid_error(self, _fpcalc, _mock_match, config_with_key: Config):
+        result = acoustid_lookup("/fake/path.mp3", config_with_key)
+        assert result is None
+
+    @patch("src.lookup.acoustid.match", side_effect=OSError("I/O error"))
+    @patch("src.lookup._fpcalc_available", return_value=True)
+    def test_returns_none_on_os_error(self, _fpcalc, _mock_match, config_with_key: Config):
         result = acoustid_lookup("/fake/path.mp3", config_with_key)
         assert result is None
 
@@ -129,6 +169,14 @@ class TestMbRecordingDetails:
     def test_returns_none_on_error(self, _mock_get, _sleep):
         assert _mb_recording_details("rec-id") is None
 
+    @patch("src.lookup.time.sleep")
+    @patch(
+        "src.lookup.musicbrainzngs.get_recording_by_id",
+        side_effect=OSError("network I/O error"),
+    )
+    def test_returns_none_on_os_error(self, _mock_get, _sleep):
+        assert _mb_recording_details("rec-id") is None
+
 
 class TestMbSearch:
     def test_returns_none_with_no_input(self):
@@ -174,3 +222,44 @@ class TestMbSearch:
         assert result is not None
         call_args = mock_search.call_args
         assert "artist:" not in call_args.kwargs.get("query", call_args[1].get("query", ""))
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.search_recordings")
+    def test_skips_recording_without_title_or_artists(self, mock_search, _sleep):
+        mock_search.return_value = {
+            "recording-list": [
+                {
+                    "ext:score": "95",
+                    "title": "",
+                    "artist-credit": [{"artist": {"name": "Radiohead"}}],
+                }
+            ]
+        }
+        result = mb_search(artists=["Radiohead"], title="Creep")
+        assert result is None
+
+    @patch("src.lookup.time.sleep")
+    @patch(
+        "src.lookup.musicbrainzngs.search_recordings",
+        side_effect=OSError("network I/O error"),
+    )
+    def test_returns_none_on_os_error(self, _mock, _sleep):
+        assert mb_search(artists=["Radiohead"], title="Creep") is None
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.search_recordings")
+    def test_handles_no_releases_in_result(self, mock_search, _sleep):
+        mock_search.return_value = {
+            "recording-list": [
+                {
+                    "ext:score": "90",
+                    "title": "Creep",
+                    "artist-credit": [{"artist": {"name": "Radiohead"}}],
+                }
+            ]
+        }
+        result = mb_search(artists=["Radiohead"], title="Creep")
+        assert result is not None
+        assert result["title"] == "Creep"
+        assert result["album"] == ""
+        assert result["year"] == ""

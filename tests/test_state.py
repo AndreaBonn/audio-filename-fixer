@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -83,3 +84,22 @@ class TestLoadSaveState:
         Path(tmp_config.state_file).write_text("not json{{{")
         result = load_state(tmp_config)
         assert result == {}
+
+    def test_save_handles_os_error_and_cleans_tmp(self, tmp_config: Config):
+        Path(tmp_config.state_file).parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = Path(tmp_config.state_file).with_suffix(".tmp")
+
+        with patch("src.state.Path.write_text", side_effect=OSError("disk full")):
+            save_state({"key": "val"}, tmp_config)
+
+        assert not tmp_path.exists()
+        assert not Path(tmp_config.state_file).exists()
+
+
+class TestAlreadyProcessedExtra:
+    def test_returns_false_when_file_unreadable(self, tmp_path: Path):
+        path = str(tmp_path / "ghost.mp3")
+        state = {path: "some_checksum"}
+        with patch("src.state.file_checksum", side_effect=OSError("unreadable")):
+            result = already_processed(path, state)
+        assert result is False

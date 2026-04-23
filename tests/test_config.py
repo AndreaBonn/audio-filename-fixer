@@ -1,8 +1,9 @@
 import os
+from pathlib import Path
 
 import pytest
 
-from src.config import Config
+from src.config import Config, setup_logging
 
 
 class TestConfig:
@@ -23,3 +24,25 @@ class TestConfig:
         config = Config()
         config.dry_run = True
         assert config.dry_run is True
+
+
+class TestSetupLogging:
+    def test_creates_log_directory(self, tmp_path: Path):
+        log_dir = tmp_path / "subdir" / "logs"
+        state_dir = tmp_path / "state"
+        config = Config(
+            log_file=str(log_dir / "tagger.log"),
+            state_file=str(state_dir / "processed.json"),
+        )
+        setup_logging(config)
+        assert log_dir.exists()
+
+    def test_creates_state_directory(self, tmp_path: Path):
+        log_dir = tmp_path / "logs"
+        state_dir = tmp_path / "subdir" / "state"
+        config = Config(
+            log_file=str(log_dir / "tagger.log"),
+            state_file=str(state_dir / "processed.json"),
+        )
+        setup_logging(config)
+        assert state_dir.exists()
