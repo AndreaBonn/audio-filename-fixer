@@ -1,7 +1,15 @@
 # Music Auto-Tagger
 
+<div align="center">
+
+[![CI](https://github.com/AndreaBonn/audio-filename-fixer/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreaBonn/audio-filename-fixer/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AndreaBonn/audio-filename-fixer/main/badges/test-badge.json)](https://github.com/AndreaBonn/audio-filename-fixer/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Security Policy](https://img.shields.io/badge/security-policy-blueviolet.svg)](SECURITY.md)
+
+</div>
 
 > **[Leggi in italiano](README.it.md)** | **[Security](SECURITY.md)**
 
