@@ -18,6 +18,12 @@ class TestSlugify:
     def test_only_unsafe_chars_returns_unknown(self):
         assert slugify(':<>"/') == "unknown"
 
+    def test_only_dots_and_spaces_returns_unknown(self):
+        assert slugify("...   ") == "unknown"
+
+    def test_whitespace_only_returns_unknown(self):
+        assert slugify("   ") == "unknown"
+
 
 class TestBuildFilename:
     def test_basic_format(self):
@@ -35,6 +41,14 @@ class TestBuildFilename:
     def test_empty_title_uses_unknown(self):
         result = build_filename(["Artist"], "", ".mp3")
         assert result == "Artist-Unknown Title.mp3"
+
+    def test_filters_empty_and_whitespace_artists(self):
+        result = build_filename(["", "Radiohead", "  "], "Creep", ".mp3")
+        assert result == "Radiohead-Creep.mp3"
+
+    def test_all_empty_artists_uses_unknown(self):
+        result = build_filename(["", "  ", ""], "Song", ".mp3")
+        assert result == "Unknown Artist-Song.mp3"
 
     def test_truncates_long_names_preserving_extension(self):
         long_title = "A" * 250
@@ -101,3 +115,34 @@ class TestParseFilename:
         artists, title = parse_filename("")
         assert artists == []
         assert title == ""
+
+    def test_parenthesis_pattern_treats_parens_as_title(self):
+        """Pattern 2 _PATTERNS[1]: group(1) = artista, group(2) = titolo in parentesi.
+
+        'Creep (Radiohead)' → artista='Creep', titolo='Radiohead'.
+        Questo pattern cattura formati come 'ArtistName (SongTitle)'.
+        """
+        artists, title = parse_filename("Creep (Radiohead)")
+        assert artists == ["Creep"]
+        assert title == "Radiohead"
+
+    def test_track_number_with_dot_prefix(self):
+        """Pattern track# con punto: '01. Artist - Title'."""
+        artists, title = parse_filename("01. Radiohead - Creep")
+        assert artists == ["Radiohead"]
+        assert title == "Creep"
+
+    def test_track_number_with_dot_no_space(self):
+        artists, title = parse_filename("03.Massive Attack - Teardrop")
+        assert artists == ["Massive Attack"]
+        assert title == "Teardrop"
+
+    def test_feat_ft_variant(self):
+        artists, title = parse_filename("Drake ft Rihanna - Take Care")
+        assert artists == ["Drake", "Rihanna"]
+        assert title == "Take Care"
+
+    def test_endash_separator(self):
+        artists, title = parse_filename("Radiohead – Creep")
+        assert artists == ["Radiohead"]
+        assert title == "Creep"

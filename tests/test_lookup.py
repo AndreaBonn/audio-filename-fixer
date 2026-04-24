@@ -122,6 +122,33 @@ class TestAcoustidLookup:
         result = acoustid_lookup("/fake/path.mp3", config_with_key)
         assert result is None
 
+    @patch("src.lookup._mb_recording_details")
+    @patch("src.lookup.acoustid.match")
+    @patch("src.lookup._fpcalc_available", return_value=True)
+    def test_accepts_score_exactly_0_5(
+        self, _fpcalc, mock_match, mock_details, config_with_key: Config
+    ):
+        """Boundary: score == 0.5 è >= 0.5, deve essere accettato."""
+        mock_match.return_value = [(0.5, "rec-id", "Title", "Artist")]
+        mock_details.return_value = {
+            "title": "Title",
+            "artists": ["Artist"],
+            "album": "",
+            "year": "",
+        }
+        result = acoustid_lookup("/fake/path.mp3", config_with_key)
+        assert result is not None
+        assert result["title"] == "Title"
+        mock_details.assert_called_once_with("rec-id")
+
+    @patch("src.lookup.acoustid.match")
+    @patch("src.lookup._fpcalc_available", return_value=True)
+    def test_rejects_score_just_below_0_5(self, _fpcalc, mock_match, config_with_key: Config):
+        """Boundary: score == 0.49 è < 0.5, deve essere rifiutato."""
+        mock_match.return_value = [(0.49, "rec-id", "Title", "Artist")]
+        result = acoustid_lookup("/fake/path.mp3", config_with_key)
+        assert result is None
+
 
 class TestMbRecordingDetails:
     @patch("src.lookup.time.sleep")
@@ -175,6 +202,64 @@ class TestMbRecordingDetails:
         side_effect=OSError("network I/O error"),
     )
     def test_returns_none_on_os_error(self, _mock_get, _sleep):
+        assert _mb_recording_details("rec-id") is None
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.get_recording_by_id")
+    def test_filters_non_dict_artist_credit_entries(self, mock_get, _sleep):
+        """MusicBrainz artist-credit può contenere stringhe join come ' & '."""
+        mock_get.return_value = {
+            "recording": {
+                "title": "Under Pressure",
+                "artist-credit": [
+                    {"artist": {"name": "Queen"}},
+                    " & ",
+                    {"artist": {"name": "David Bowie"}},
+                ],
+                "release-list": [],
+            }
+        }
+        result = _mb_recording_details("rec-id")
+        assert result["artists"] == ["Queen", "David Bowie"]
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.get_recording_by_id")
+    def test_handles_malformed_short_date(self, mock_get, _sleep):
+        """Data con meno di 4 caratteri non causa errori."""
+        mock_get.return_value = {
+            "recording": {
+                "title": "Song",
+                "artist-credit": [{"artist": {"name": "Band"}}],
+                "release-list": [{"title": "Album", "date": "199"}],
+            }
+        }
+        result = _mb_recording_details("rec-id")
+        assert result["year"] == "199"
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.get_recording_by_id")
+    def test_truncates_full_date_to_four_chars(self, mock_get, _sleep):
+        """Data completa '1993-02-22' → anno '1993'."""
+        mock_get.return_value = {
+            "recording": {
+                "title": "Creep",
+                "artist-credit": [{"artist": {"name": "Radiohead"}}],
+                "release-list": [{"title": "Pablo Honey", "date": "1993-02-22"}],
+            }
+        }
+        result = _mb_recording_details("rec-id")
+        assert result["year"] == "1993"
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.get_recording_by_id")
+    def test_returns_none_when_no_artists(self, mock_get, _sleep):
+        mock_get.return_value = {
+            "recording": {
+                "title": "Song",
+                "artist-credit": [],
+                "release-list": [],
+            }
+        }
         assert _mb_recording_details("rec-id") is None
 
 
@@ -245,6 +330,70 @@ class TestMbSearch:
     )
     def test_returns_none_on_os_error(self, _mock, _sleep):
         assert mb_search(artists=["Radiohead"], title="Creep") is None
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.search_recordings")
+    def test_accepts_score_exactly_70(self, mock_search, _sleep):
+        """Boundary: score == 70 è >= 70, deve essere accettato."""
+        mock_search.return_value = {
+            "recording-list": [
+                {
+                    "ext:score": "70",
+                    "title": "Creep",
+                    "artist-credit": [{"artist": {"name": "Radiohead"}}],
+                    "release-list": [{"title": "Pablo Honey", "date": "1993"}],
+                }
+            ]
+        }
+        result = mb_search(artists=["Radiohead"], title="Creep")
+        assert result is not None
+        assert result["title"] == "Creep"
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.search_recordings")
+    def test_rejects_score_69(self, mock_search, _sleep):
+        """Boundary: score == 69 è < 70, deve essere rifiutato."""
+        mock_search.return_value = {
+            "recording-list": [
+                {
+                    "ext:score": "69",
+                    "title": "Creep",
+                    "artist-credit": [{"artist": {"name": "Radiohead"}}],
+                }
+            ]
+        }
+        assert mb_search(artists=["Radiohead"], title="Creep") is None
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.search_recordings")
+    def test_searches_with_artist_only(self, mock_search, _sleep):
+        """Con solo artista e titolo vuoto, la query non contiene 'recording:'."""
+        mock_search.return_value = MB_SEARCH_RESPONSE
+        mb_search(artists=["Radiohead"], title="")
+        query = mock_search.call_args.kwargs.get("query", mock_search.call_args[1].get("query", ""))
+        assert "recording:" not in query
+        assert 'artist:"Radiohead"' in query
+
+    @patch("src.lookup.time.sleep")
+    @patch("src.lookup.musicbrainzngs.search_recordings")
+    def test_filters_non_dict_artist_credit_in_search(self, mock_search, _sleep):
+        """Anche in mb_search, le stringhe join nell'artist-credit vengono filtrate."""
+        mock_search.return_value = {
+            "recording-list": [
+                {
+                    "ext:score": "90",
+                    "title": "Under Pressure",
+                    "artist-credit": [
+                        {"artist": {"name": "Queen"}},
+                        " & ",
+                        {"artist": {"name": "David Bowie"}},
+                    ],
+                    "release-list": [],
+                }
+            ]
+        }
+        result = mb_search(artists=["Queen"], title="Under Pressure")
+        assert result["artists"] == ["Queen", "David Bowie"]
 
     @patch("src.lookup.time.sleep")
     @patch("src.lookup.musicbrainzngs.search_recordings")

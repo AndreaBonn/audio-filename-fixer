@@ -45,6 +45,23 @@ class TestFileChecksum:
         f2.write_bytes(b"content B")
         assert file_checksum(str(f1)) != file_checksum(str(f2))
 
+    def test_reads_only_first_64kb(self, tmp_path: Path):
+        """File >64KB: checksum basato solo sui primi 64KB."""
+        shared_prefix = b"A" * 65536  # esattamente 64KB
+        f1 = tmp_path / "big1.mp3"
+        f2 = tmp_path / "big2.mp3"
+        f1.write_bytes(shared_prefix + b"TAIL_ONE")
+        f2.write_bytes(shared_prefix + b"TAIL_TWO")
+        # Stessi primi 64KB → stesso checksum
+        assert file_checksum(str(f1)) == file_checksum(str(f2))
+
+    def test_different_first_64kb_different_checksum(self, tmp_path: Path):
+        f1 = tmp_path / "diff1.mp3"
+        f2 = tmp_path / "diff2.mp3"
+        f1.write_bytes(b"A" * 65536)
+        f2.write_bytes(b"B" * 65536)
+        assert file_checksum(str(f1)) != file_checksum(str(f2))
+
 
 class TestAlreadyProcessed:
     def test_unknown_file_returns_false(self, sample_file: Path):
@@ -93,6 +110,17 @@ class TestLoadSaveState:
             save_state({"key": "val"}, tmp_config)
 
         assert not tmp_path.exists()
+        assert not Path(tmp_config.state_file).exists()
+
+    def test_save_cleans_tmp_when_replace_fails(self, tmp_config: Config):
+        """Se write_text riesce ma replace() fallisce, il .tmp viene rimosso."""
+        Path(tmp_config.state_file).parent.mkdir(parents=True, exist_ok=True)
+        tmp_file = Path(tmp_config.state_file).with_suffix(".tmp")
+
+        with patch("src.state.Path.replace", side_effect=OSError("replace failed")):
+            save_state({"key": "val"}, tmp_config)
+
+        assert not tmp_file.exists()
         assert not Path(tmp_config.state_file).exists()
 
 

@@ -54,6 +54,21 @@ class TestReadExistingTags:
         assert result["year"] == "2023"
         assert result["track"] == "3"
 
+    @patch("src.tags.MutagenFile")
+    def test_truncates_year_from_full_date(self, mock_file):
+        """Data '1993-02-22' → anno '1993' (primi 4 caratteri)."""
+        mock_audio = MagicMock()
+        mock_audio.get.side_effect = lambda key, default=None: {
+            "title": ["Song"],
+            "artist": ["Band"],
+            "album": ["Album"],
+            "date": ["1993-02-22"],
+            "tracknumber": ["1"],
+        }.get(key, default)
+        mock_file.return_value = mock_audio
+        result = read_existing_tags("/fake/path.mp3")
+        assert result["year"] == "1993"
+
     @patch("src.tags.MutagenFile", return_value=None)
     def test_returns_default_when_mutagen_returns_none(self, _mock):
         result = read_existing_tags("/fake/path.xyz")
@@ -243,6 +258,65 @@ class TestWriteTags:
         assert "TALB" not in tags
         assert "TDRC" not in tags
 
+    def test_writes_mp3_without_id3_header(self, mp3_file: Path):
+        """MP3 senza header ID3 → ID3NoHeaderError → crea nuovo tag."""
+        from mutagen.id3 import ID3NoHeaderError as ID3Err
+
+        original_id3 = ID3
+
+        call_count = 0
+
+        def id3_side_effect(path=None, *args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1 and path is not None:
+                raise ID3Err("no ID3 header")
+            return original_id3()
+
+        with patch("src.tags.ID3", side_effect=id3_side_effect):
+            result = write_tags(
+                str(mp3_file),
+                {"title": "Creep", "artists": ["Radiohead"], "album": "", "year": ""},
+            )
+        assert result is True
+
+    def test_writes_mp3_multiple_artists_joined(self, mp3_file: Path):
+        """Artisti multipli separati da '; ' nel tag TPE1."""
+        info = {"title": "Song", "artists": ["A", "B", "C"], "album": "", "year": ""}
+        write_tags(str(mp3_file), info)
+        tags = ID3(str(mp3_file))
+        assert str(tags["TPE1"]) == "A; B; C"
+
+    @patch("src.tags.MP4")
+    def test_writes_aac_tags(self, mock_mp4_cls, tmp_path: Path):
+        """Estensione .aac usa lo stesso branch di .m4a."""
+        mock_audio = MagicMock()
+        mock_mp4_cls.return_value = mock_audio
+        path = str(tmp_path / "track.aac")
+        result = write_tags(
+            path,
+            {"title": "Song", "artists": ["Artist"], "album": "Album", "year": "2020"},
+        )
+        assert result is True
+        mock_audio.__setitem__.assert_any_call("\xa9nam", "Song")
+        mock_audio.__setitem__.assert_any_call("\xa9ART", "Artist")
+        mock_audio.save.assert_called_once()
+
+    @patch("src.tags.OggVorbis")
+    def test_writes_opus_tags(self, mock_ogg_cls, tmp_path: Path):
+        """Estensione .opus usa lo stesso branch di .ogg."""
+        mock_audio = MagicMock()
+        mock_ogg_cls.return_value = mock_audio
+        path = str(tmp_path / "track.opus")
+        result = write_tags(
+            path,
+            {"title": "Song", "artists": ["Artist"], "album": "Album", "year": "2020"},
+        )
+        assert result is True
+        mock_audio.__setitem__.assert_any_call("title", "Song")
+        mock_audio.__setitem__.assert_any_call("artist", "Artist")
+        mock_audio.save.assert_called_once()
+
     @patch("src.tags.ID3", side_effect=PermissionError("access denied"))
     def test_handles_permission_error(self, _mock, mp3_file: Path):
         result = write_tags(
@@ -287,6 +361,18 @@ class TestRenameFile:
         assert Path(new_path).exists()
         assert existing.exists()  # originale intatto
         assert "_dup" in Path(new_path).stem
+
+    def test_duplicate_file_preserves_content(self, tmp_path: Path):
+        """Il file rinominato con _dup mantiene il contenuto originale."""
+        existing = tmp_path / "Radiohead-Creep.mp3"
+        existing.write_bytes(b"original content")
+        f = tmp_path / "old_name.mp3"
+        f.write_bytes(b"my content here")
+
+        info = {"title": "Creep", "artists": ["Radiohead"]}
+        new_path = rename_file(str(f), info)
+        assert Path(new_path).read_bytes() == b"my content here"
+        assert existing.read_bytes() == b"original content"
 
     def test_no_rename_if_already_correct(self, tmp_path: Path):
         f = tmp_path / "Radiohead-Creep.mp3"
