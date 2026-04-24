@@ -23,5 +23,5 @@ if [ ! -f "$VENV_PYTHON" ]; then
     exit 1
 fi
 
-echo "Avvio Music Auto-Tagger..."
+echo "Avvio Music Filename-Fixer & Auto-Tagger..."
 exec "$VENV_PYTHON" "$SCRIPT_DIR/music_tagger.py" "$@"

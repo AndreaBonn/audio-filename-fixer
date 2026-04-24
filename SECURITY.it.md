@@ -2,11 +2,11 @@
 
 > **[Read in English](SECURITY.md)** | **[Torna al README](README.it.md)**
 
-Questo documento descrive le misure di sicurezza implementate in Music Auto-Tagger, a quali dati accede e quali garanzie fornisce. L'obiettivo è darti piena trasparenza su cosa fa questo strumento sul tuo computer.
+Questo documento descrive le misure di sicurezza implementate in Music Filename-Fixer & Auto-Tagger, a quali dati accede e quali garanzie fornisce. L'obiettivo è darti piena trasparenza su cosa fa questo strumento sul tuo computer.
 
 ## Panoramica
 
-Music Auto-Tagger è uno strumento **locale, offline-first**. Gira sulla tua macchina, modifica solo i file che gli indichi e contatta API esterne solo quando necessario per l'identificazione dei brani. Non raccoglie, memorizza o trasmette alcun dato personale.
+Music Filename-Fixer & Auto-Tagger è uno strumento **locale, offline-first**. Gira sulla tua macchina, modifica solo i file che gli indichi e contatta API esterne solo quando necessario per l'identificazione dei brani. Non raccoglie, memorizza o trasmette alcun dato personale.
 
 ## A Cosa Accede
 

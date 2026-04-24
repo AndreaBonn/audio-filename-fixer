@@ -12,7 +12,7 @@ STATE_DIR="$SCRIPT_DIR/state"
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 
 echo "======================================================"
-echo "  Music Auto-Tagger — Installazione"
+echo "  Music Filename-Fixer & Auto-Tagger — Installazione"
 echo "======================================================"
 echo "  Cartella musica : $MUSIC_DIR"
 echo "  Script dir      : $SCRIPT_DIR"
@@ -53,7 +53,7 @@ echo "  ✓ Directory create"
 # ── 4. File di configurazione ──────────────────────────────────────────────────
 echo "[4/6] Creazione file di configurazione..."
 cat > "$SCRIPT_DIR/config.env" << EOF
-# Configurazione Music Auto-Tagger
+# Configurazione Music Filename-Fixer & Auto-Tagger
 # Modifica questo file secondo le tue esigenze
 
 # Cartella contenente la musica (obbligatorio)
@@ -80,7 +80,7 @@ mkdir -p "$SYSTEMD_USER_DIR"
 # Servizio principale
 cat > "$SYSTEMD_USER_DIR/music-tagger.service" << EOF
 [Unit]
-Description=Music Auto-Tagger
+Description=Music Filename-Fixer & Auto-Tagger
 After=network.target
 
 [Service]
@@ -100,7 +100,7 @@ EOF
 # Timer giornaliero (esegue il servizio ogni giorno alle 3:00)
 cat > "$SYSTEMD_USER_DIR/music-tagger.timer" << EOF
 [Unit]
-Description=Music Auto-Tagger — esecuzione giornaliera
+Description=Music Filename-Fixer & Auto-Tagger — esecuzione giornaliera
 Requires=music-tagger.service
 
 [Timer]

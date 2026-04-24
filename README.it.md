@@ -1,4 +1,4 @@
-# Music Auto-Tagger
+# Music Filename-Fixer & Auto-Tagger
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -377,7 +377,7 @@ Poi eseguilo con: `powershell -File run.ps1` oppure `powershell -File run.ps1 --
 
 1. Apri **Utilità di pianificazione** (cercalo nel menu Start)
 2. Clicca **"Crea attività di base"** nel pannello destro
-3. Nome: `Music Auto-Tagger`, clicca Avanti
+3. Nome: `Music Filename-Fixer & Auto-Tagger`, clicca Avanti
 4. Trigger: **Ogni giorno**, clicca Avanti
 5. Imposta l'orario alle **3:00**, clicca Avanti
 6. Azione: **Avvio programma**, clicca Avanti

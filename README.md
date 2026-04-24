@@ -1,4 +1,4 @@
-# Music Auto-Tagger
+# Music Filename-Fixer & Auto-Tagger
 
 <div align="center">
 
@@ -386,7 +386,7 @@ Then run it with: `powershell -File run.ps1` or `powershell -File run.ps1 --dry-
 
 1. Open **Task Scheduler** (search for it in the Start menu)
 2. Click **"Create Basic Task"** in the right panel
-3. Name: `Music Auto-Tagger`, click Next
+3. Name: `Music Filename-Fixer & Auto-Tagger`, click Next
 4. Trigger: **Daily**, click Next
 5. Set the time to **3:00 AM**, click Next
 6. Action: **Start a program**, click Next

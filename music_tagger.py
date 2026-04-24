@@ -162,7 +162,9 @@ def main():
         sys.exit(1)
 
     log.info("=" * 60)
-    log.info(f"Music Auto-Tagger avviato — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    log.info(
+        f"Music Filename-Fixer & Auto-Tagger avviato — {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
     log.info(f"Cartella: {config.music_dir}")
     if config.dry_run:
         log.info("** DRY RUN — nessun file verrà modificato **")

@@ -2,11 +2,11 @@
 
 > **[Leggi in italiano](SECURITY.it.md)** | **[Back to README](README.md)**
 
-This document describes the security measures implemented in Music Auto-Tagger, what data it accesses, and what guarantees it provides. The goal is to give you full transparency about what this tool does on your machine.
+This document describes the security measures implemented in Music Filename-Fixer & Auto-Tagger, what data it accesses, and what guarantees it provides. The goal is to give you full transparency about what this tool does on your machine.
 
 ## Overview
 
-Music Auto-Tagger is a **local-only, offline-first** tool. It runs on your machine, modifies only files you point it to, and contacts external APIs only when needed for song identification. It does not collect, store, or transmit any personal data.
+Music Filename-Fixer & Auto-Tagger is a **local-only, offline-first** tool. It runs on your machine, modifies only files you point it to, and contacts external APIs only when needed for song identification. It does not collect, store, or transmit any personal data.
 
 ## What It Accesses
 
