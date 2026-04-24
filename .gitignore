@@ -17,6 +17,10 @@ logs/
 .vscode/
 .idea/
 
+# Coverage
+coverage/
+.coverage
+
 # OS
 .DS_Store
 Thumbs.db
