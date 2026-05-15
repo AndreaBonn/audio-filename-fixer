@@ -26,6 +26,48 @@ xXx_radiohead_creep_OFFICIAL_2023_[HD].mp3  -->  Radiohead-Creep.mp3
 some_random_hash_a8f3e2.ogg                 -->  Massive Attack-Teardrop.ogg
 ```
 
+## Architettura
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+graph LR
+  tagger["music_tagger.py<br/>Orchestratore"]:::core
+
+  subgraph modules["Moduli Sorgente"]
+    direction TB
+    config["config.py<br/>Configurazione"]:::data
+    parser["parser.py<br/>Parsing Nome File"]:::engine
+    lookup["lookup.py<br/>Ricerca API"]:::engine
+    tags["tags.py<br/>Metadati R/W"]:::engine
+    state["state.py<br/>Tracking Checksum"]:::data
+  end
+
+  subgraph external["Servizi Esterni"]
+    direction TB
+    acoustid["AcoustID API"]:::ext
+    musicbrainz["MusicBrainz API"]:::ext
+    audio_files[("File Audio")]:::ext
+    state_file[("processed.json")]:::ext
+  end
+
+  tagger --> config
+  tagger --> parser
+  tagger --> lookup
+  tagger --> tags
+  tagger --> state
+
+  lookup -->|"fingerprint"| acoustid
+  lookup -->|"metadati"| musicbrainz
+  tags -->|"leggi/scrivi tag"| audio_files
+  tags -->|"rinomina"| audio_files
+  state -->|"carica/salva"| state_file
+
+  classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
+  classDef data fill:#d97706,stroke:#b45309,color:#fff
+  classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
+  classDef engine fill:#059669,stroke:#047857,color:#fff
+```
+
 ## Formati Supportati
 
 MP3, FLAC, M4A, AAC, OGG, Opus, WMA
@@ -517,19 +559,79 @@ audio-filename-fixer/
 
 ## Come Funziona
 
+### Processamento File
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+graph TD
+  scan(["Scansiona file audio"]):::core
+  check_state{"Già processato?<br/>checksum coincide"}
+  skip_done(["Salta"]):::data
+  read_tags["Leggi tag esistenti"]:::engine
+  check_tags{"Tag completi E<br/>nome file OK?"}
+  mark_done(["Segna completato, salta"]):::data
+  acoustid{"Fingerprint AcoustID<br/>score #gt;= 0.5?"}:::engine
+  mb_search{"Ricerca MusicBrainz<br/>score #gt;= 70?"}:::engine
+  fallback["Parser nome file<br/>fallback"]:::engine
+  write_tags["Scrivi tag + rinomina"]:::core
+  log_warn(["Log warning, salta"]):::ext
+  save_state["Aggiorna stato"]:::data
+
+  scan --> check_state
+  check_state -->|"Sì"| skip_done
+  check_state -->|"No"| read_tags
+  read_tags --> check_tags
+  check_tags -->|"Sì"| mark_done
+  check_tags -->|"No"| acoustid
+  acoustid -->|"Sì"| write_tags
+  acoustid -->|"No"| mb_search
+  mb_search -->|"Sì"| write_tags
+  mb_search -->|"No"| fallback
+  fallback -->|"Trovato"| write_tags
+  fallback -->|"Fallito"| log_warn
+  write_tags --> save_state
+
+  classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
+  classDef data fill:#d97706,stroke:#b45309,color:#fff
+  classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
+  classDef engine fill:#059669,stroke:#047857,color:#fff
+```
+
 ### Pipeline di Ricerca
 
-```
-File Audio
-    │
-    ├─→ AcoustID (fingerprint) ──→ dettagli recording MusicBrainz
-    │         score >= 0.5
-    │
-    ├─→ Ricerca testuale MusicBrainz ──→ artista + titolo da nome file/tag
-    │         score >= 70
-    │
-    └─→ Parser nome file (fallback) ──→ estrazione basata su regex
-              pattern "Artista - Titolo"
+```mermaid
+sequenceDiagram
+  participant mt as music_tagger
+  participant lk as lookup
+  participant fp as fpcalc
+  participant ac as AcoustID API
+  participant mb as MusicBrainz API
+  participant ps as parser
+
+  mt->>+lk: acoustid_lookup(path)
+  lk->>+fp: calcola fingerprint
+  fp-->>-lk: dati fingerprint
+  lk->>+ac: fingerprint + api_key
+  ac-->>-lk: recording_id o errore
+
+  alt score >= 0.5
+    lk->>+mb: dettagli recording
+    mb-->>-lk: titolo, artisti, album, anno
+    lk-->>-mt: metadati trovati
+  else AcoustID fallito
+    lk-->>mt: nessun risultato
+    mt->>+lk: mb_search(artisti, titolo)
+    lk->>+mb: ricerca testuale
+    alt score >= 70
+      mb-->>-lk: titolo, artisti, album, anno
+      lk-->>-mt: metadati trovati
+    else MusicBrainz fallito
+      mb-->>lk: nessuna corrispondenza
+      lk-->>mt: nessun risultato
+      mt->>+ps: parse_filename(stem)
+      ps-->>-mt: artisti + titolo estratti
+    end
+  end
 ```
 
 ### Parser dei Nomi File

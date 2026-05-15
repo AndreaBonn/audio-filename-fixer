@@ -35,6 +35,48 @@ xXx_radiohead_creep_OFFICIAL_2023_[HD].mp3  -->  Radiohead-Creep.mp3
 some_random_hash_a8f3e2.ogg                 -->  Massive Attack-Teardrop.ogg
 ```
 
+## Architecture
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+graph LR
+  tagger["music_tagger.py<br/>Orchestrator"]:::core
+
+  subgraph modules["Source Modules"]
+    direction TB
+    config["config.py<br/>Configuration"]:::data
+    parser["parser.py<br/>Filename Parsing"]:::engine
+    lookup["lookup.py<br/>API Lookup"]:::engine
+    tags["tags.py<br/>Metadata R/W"]:::engine
+    state["state.py<br/>Checksum Tracking"]:::data
+  end
+
+  subgraph external["External Services"]
+    direction TB
+    acoustid["AcoustID API"]:::ext
+    musicbrainz["MusicBrainz API"]:::ext
+    audio_files[("Audio Files")]:::ext
+    state_file[("processed.json")]:::ext
+  end
+
+  tagger --> config
+  tagger --> parser
+  tagger --> lookup
+  tagger --> tags
+  tagger --> state
+
+  lookup -->|"fingerprint"| acoustid
+  lookup -->|"metadata"| musicbrainz
+  tags -->|"read/write tags"| audio_files
+  tags -->|"rename"| audio_files
+  state -->|"load/save"| state_file
+
+  classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
+  classDef data fill:#d97706,stroke:#b45309,color:#fff
+  classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
+  classDef engine fill:#059669,stroke:#047857,color:#fff
+```
+
 ## Supported Formats
 
 MP3, FLAC, M4A, AAC, OGG, Opus, WMA
@@ -526,19 +568,79 @@ audio-filename-fixer/
 
 ## How It Works
 
+### File Processing
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+graph TD
+  scan(["Scan audio file"]):::core
+  check_state{"Already processed?<br/>checksum match"}
+  skip_done(["Skip"]):::data
+  read_tags["Read existing tags"]:::engine
+  check_tags{"Tags complete AND<br/>filename OK?"}
+  mark_done(["Mark done, skip"]):::data
+  acoustid{"AcoustID fingerprint<br/>score #gt;= 0.5?"}:::engine
+  mb_search{"MusicBrainz search<br/>score #gt;= 70?"}:::engine
+  fallback["Filename parser<br/>fallback"]:::engine
+  write_tags["Write tags + rename"]:::core
+  log_warn(["Log warning, skip"]):::ext
+  save_state["Update state"]:::data
+
+  scan --> check_state
+  check_state -->|"Yes"| skip_done
+  check_state -->|"No"| read_tags
+  read_tags --> check_tags
+  check_tags -->|"Yes"| mark_done
+  check_tags -->|"No"| acoustid
+  acoustid -->|"Yes"| write_tags
+  acoustid -->|"No"| mb_search
+  mb_search -->|"Yes"| write_tags
+  mb_search -->|"No"| fallback
+  fallback -->|"Found"| write_tags
+  fallback -->|"Failed"| log_warn
+  write_tags --> save_state
+
+  classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
+  classDef data fill:#d97706,stroke:#b45309,color:#fff
+  classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
+  classDef engine fill:#059669,stroke:#047857,color:#fff
+```
+
 ### Lookup Pipeline
 
-```
-Audio File
-    │
-    ├─→ AcoustID (fingerprint) ──→ MusicBrainz recording details
-    │         score >= 0.5
-    │
-    ├─→ MusicBrainz text search ──→ artist + title from filename/tags
-    │         score >= 70
-    │
-    └─→ Filename parser (fallback) ──→ regex-based extraction
-              "Artist - Title" patterns
+```mermaid
+sequenceDiagram
+  participant mt as music_tagger
+  participant lk as lookup
+  participant fp as fpcalc
+  participant ac as AcoustID API
+  participant mb as MusicBrainz API
+  participant ps as parser
+
+  mt->>+lk: acoustid_lookup(path)
+  lk->>+fp: calculate fingerprint
+  fp-->>-lk: fingerprint data
+  lk->>+ac: fingerprint + api_key
+  ac-->>-lk: recording_id or error
+
+  alt score >= 0.5
+    lk->>+mb: get recording details
+    mb-->>-lk: title, artists, album, year
+    lk-->>-mt: metadata found
+  else AcoustID failed
+    lk-->>mt: no result
+    mt->>+lk: mb_search(artists, title)
+    lk->>+mb: text search query
+    alt score >= 70
+      mb-->>-lk: title, artists, album, year
+      lk-->>-mt: metadata found
+    else MusicBrainz failed
+      mb-->>lk: no match
+      lk-->>mt: no result
+      mt->>+ps: parse_filename(stem)
+      ps-->>-mt: parsed artists + title
+    end
+  end
 ```
 
 ### Filename Parser
